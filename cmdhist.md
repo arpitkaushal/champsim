@@ -18,5 +18,4 @@
 Hopefully, after all the above commands your ChampSim Build will work fine. 
 So, run the default test command now.  
 
-
     ./build_champsim.sh bimodal no no no no lru 1
