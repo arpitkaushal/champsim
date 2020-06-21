@@ -2,8 +2,8 @@ cd ..
 
 mkdir -p logs
 
-echo  'TASK 2\nStart Time: ' >> ./logs/task-1.txt
-echo  'TASK 2 ERRORS/WARNINGS\n' >> ./logs/task-1-err.txt
+echo  'TASK 1\nStart Time: ' >> ./logs/task-1.txt
+echo  'TASK 1 ERRORS/WARNINGS\n' >> ./logs/task-1-err.txt
 
 exec 1>> ./logs/task-1.txt 
 exec 2>> ./logs/task-1-err.txt 
