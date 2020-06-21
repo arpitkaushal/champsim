@@ -1,0 +1,113 @@
+454.calculix-104B.champsimtrace.xz
+
+----------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------
+BIMODAL
+
+*** ChampSim Multicore Out-of-Order Simulator ***
+
+Warmup Instructions: 1000000
+Simulation Instructions: 10000000
+Number of CPUs: 1
+LLC sets: 2048
+LLC ways: 16
+Off-chip DRAM Size: 4096 MB Channels: 1 Width: 64-bit Data Rate: 3200 MT/s
+
+CPU 0 Bimodal branch predictor
+
+Warmup complete CPU 0 instructions: 1000003 cycles: 386981 (Simulation time: 0 hr 0 min 2 sec) 
+
+Heartbeat CPU 0 instructions: 10000000 cycles: 7983226 heartbeat IPC: 1.25263 cumulative IPC: 1.1848 (Simulation time: 0 hr 0 min 12 sec) 
+Finished CPU 0 instructions: 10000000 cycles: 8435294 cumulative IPC: 1.1855 (Simulation time: 0 hr 0 min 13 sec) 
+
+CPU 0 cumulative IPC: 1.1855 instructions: 10000000 cycles: 8435294
+CPU 0 Branch Prediction Accuracy: 72.2378% MPKI: 25.0141 Average ROB Occupancy at Mispredict: 28.2139
+
+Branch types
+NOT_BRANCH: 9098697 90.987%
+BRANCH_DIRECT_JUMP: 146683 1.46683%
+BRANCH_INDIRECT: 0 0%
+BRANCH_CONDITIONAL: 754275 7.54275%
+BRANCH_DIRECT_CALL: 27 0.00027%
+BRANCH_INDIRECT_CALL: 0 0%
+BRANCH_RETURN: 27 0.00027%
+BRANCH_OTHER: 0 0%
+
+----------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------
+GSHARE
+
+
+CPU 0 GSHARE branch predictor
+
+Warmup complete CPU 0 instructions: 1000003 cycles: 386979 (Simulation time: 0 hr 0 min 2 sec) 
+
+Heartbeat CPU 0 instructions: 10000000 cycles: 4933544 heartbeat IPC: 2.02694 cumulative IPC: 1.97952 (Simulation time: 0 hr 0 min 15 sec) 
+Finished CPU 0 instructions: 10000000 cycles: 5047134 cumulative IPC: 1.98132 (Simulation time: 0 hr 0 min 16 sec) 
+
+CPU 0 cumulative IPC: 1.98132 instructions: 10000000 cycles: 5047134
+CPU 0 Branch Prediction Accuracy: 96.8821% MPKI: 2.8093 Average ROB Occupancy at Mispredict: 85.7455
+
+Branch types
+NOT_BRANCH: 9098776 90.9878%
+BRANCH_DIRECT_JUMP: 146684 1.46684%
+BRANCH_INDIRECT: 0 0%
+BRANCH_CONDITIONAL: 754282 7.54282%
+BRANCH_DIRECT_CALL: 27 0.00027%
+BRANCH_INDIRECT_CALL: 0 0%
+BRANCH_RETURN: 27 0.00027%
+BRANCH_OTHER: 0 0%
+
+----------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------
+HASHED_PERCEPTRON
+
+
+
+Warmup complete CPU 0 instructions: 1000003 cycles: 386981 (Simulation time: 0 hr 0 min 2 sec) 
+
+Heartbeat CPU 0 instructions: 10000000 cycles: 4624598 heartbeat IPC: 2.16235 cumulative IPC: 2.12383 (Simulation time: 0 hr 0 min 15 sec) 
+Finished CPU 0 instructions: 10000000 cycles: 4704005 cumulative IPC: 2.12585 (Simulation time: 0 hr 0 min 17 sec) 
+
+CPU 0 cumulative IPC: 2.12585 instructions: 10000000 cycles: 4704005
+CPU 0 Branch Prediction Accuracy: 99.6659% MPKI: 0.301 Average ROB Occupancy at Mispredict: 92.8488
+
+Branch types
+NOT_BRANCH: 9098789 90.9879%
+BRANCH_DIRECT_JUMP: 146684 1.46684%
+BRANCH_INDIRECT: 0 0%
+BRANCH_CONDITIONAL: 754285 7.54285%
+BRANCH_DIRECT_CALL: 27 0.00027%
+BRANCH_INDIRECT_CALL: 0 0%
+BRANCH_RETURN: 27 0.00027%
+BRANCH_OTHER: 0 0%
+
+----------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------
+PERCEPTRON
+
+
+
+Warmup complete CPU 0 instructions: 1000003 cycles: 386979 (Simulation time: 0 hr 0 min 2 sec) 
+
+Heartbeat CPU 0 instructions: 10000000 cycles: 4925208 heartbeat IPC: 2.03037 cumulative IPC: 1.98315 (Simulation time: 0 hr 0 min 15 sec) 
+Finished CPU 0 instructions: 10000000 cycles: 5037835 cumulative IPC: 1.98498 (Simulation time: 0 hr 0 min 17 sec) 
+
+CPU 0 cumulative IPC: 1.98498 instructions: 10000000 cycles: 5037835
+CPU 0 Branch Prediction Accuracy: 96.9556% MPKI: 2.7431 Average ROB Occupancy at Mispredict: 86.0207
+
+Branch types
+NOT_BRANCH: 9098776 90.9878%
+BRANCH_DIRECT_JUMP: 146684 1.46684%
+BRANCH_INDIRECT: 0 0%
+BRANCH_CONDITIONAL: 754282 7.54282%
+BRANCH_DIRECT_CALL: 27 0.00027%
+BRANCH_INDIRECT_CALL: 0 0%
+BRANCH_RETURN: 27 0.00027%
+BRANCH_OTHER: 0 0%
+
+

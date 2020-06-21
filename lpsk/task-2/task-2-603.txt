@@ -1,0 +1,96 @@
+
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Bimodal
+
+
+Warmup Instructions: 1000000
+Simulation Instructions: 10000000
+Number of CPUs: 1
+LLC sets: 2048
+LLC ways: 16
+Off-chip DRAM Size: 4096 MB Channels: 1 Width: 64-bit Data Rate: 3200 MT/s
+
+CPU 0 Bimodal branch predictor
+
+Heartbeat CPU 0 instructions: 10000002 cycles: 7858674 heartbeat IPC: 1.27248 cumulative IPC: 1.19688 (Simulation time: 0 hr 0 min 11 sec) 
+Finished CPU 0 instructions: 10000003 cycles: 8353745 cumulative IPC: 1.19707 (Simulation time: 0 hr 0 min 12 sec) 
+
+CPU 0 Branch Prediction Accuracy: 87.5014% MPKI: 18.0166 Average ROB Occupancy at Mispredict: 20.1549
+
+Branch types
+NOT_BRANCH: 8558234 85.5823%
+BRANCH_DIRECT_JUMP: 105534 1.05534%
+BRANCH_INDIRECT: 3284 0.03284%
+BRANCH_CONDITIONAL: 1309868 13.0987%
+BRANCH_DIRECT_CALL: 11402 0.11402%
+BRANCH_INDIRECT_CALL: 0 0%
+BRANCH_RETURN: 11401 0.11401%
+BRANCH_OTHER: 0 0%
+
+
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+
+CPU 0 GSHARE branch predictor
+
+Heartbeat CPU 0 instructions: 10000002 cycles: 7205080 heartbeat IPC: 1.38791 cumulative IPC: 1.31104 (Simulation time: 0 hr 0 min 10 sec) 
+Finished CPU 0 instructions: 10000003 cycles: 7626898 cumulative IPC: 1.31115 (Simulation time: 0 hr 0 min 11 sec) 
+
+CPU 0 Branch Prediction Accuracy: 93.5709% MPKI: 9.2674 Average ROB Occupancy at Mispredict: 24.5681
+
+Branch types
+NOT_BRANCH: 8558233 85.5823%
+BRANCH_DIRECT_JUMP: 105534 1.05534%
+BRANCH_INDIRECT: 3284 0.03284%
+BRANCH_CONDITIONAL: 1309867 13.0987%
+BRANCH_DIRECT_CALL: 11402 0.11402%
+BRANCH_INDIRECT_CALL: 0 0%
+BRANCH_RETURN: 11401 0.11401%
+BRANCH_OTHER: 0 0%
+
+
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+
+
+Warmup complete CPU 0 instructions: 1000001 cycles: 340514 (Simulation time: 0 hr 0 min 1 sec) Heartbeat CPU 0 instructions: 10000002 cycles: 6240301 heartbeat IPC: 1.60249 cumulative IPC: 1.52548 (Simulation time: 0 hr 0 min 12 sec) 
+Finished CPU 0 instructions: 10000003 cycles: 6552766 cumulative IPC: 1.52607 (Simulation time: 0 hr 0 min 14 sec) 
+
+ChampSim completed all CPUs
+
+.3135
+
+Branch types
+NOT_BRANCH: 8558242 85.5824%
+BRANCH_DIRECT_JUMP: 105534 1.05534%
+BRANCH_INDIRECT: 3284 0.03284%
+BRANCH_CONDITIONAL: 1309869 13.0987%
+BRANCH_DIRECT_CALL: 11402 0.11402%
+BRANCH_INDIRECT_CALL: 0 0%
+BRANCH_RETURN: 11401 0.11401%
+BRANCH_OTHER: 0 0%
+
+
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+
+
+Warmup complete CPU 0 instructions: 1000001 cycles: 340258 (Simulation time: 0 hr 0 min 1 sec) Heartbeat CPU 0 instructions: 10000002 cycles: 7414880 heartbeat IPC: 1.34864 cumulative IPC: 1.27215 (Simulation time: 0 hr 0 min 12 sec) 
+Finished CPU 0 instructions: 10000003 cycles: 7857920 cumulative IPC: 1.2726 (Simulation time: 0 hr 0 min 13 sec) 
+
+ChampSim completed all CPUs
+
+2252
+
+Branch types
+NOT_BRANCH: 8558234 85.5823%
+BRANCH_DIRECT_JUMP: 105534 1.05534%
+BRANCH_INDIRECT: 3284 0.03284%
+BRANCH_CONDITIONAL: 1309868 13.0987%
+BRANCH_DIRECT_CALL: 11402 0.11402%
+BRANCH_INDIRECT_CALL: 0 0%
+BRANCH_RETURN: 11401 0.11401%
+BRANCH_OTHER: 0 0%
+
+

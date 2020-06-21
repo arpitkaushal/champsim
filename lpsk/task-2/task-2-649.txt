@@ -1,0 +1,72 @@
+
+Warmup Instructions: 1000000
+Simulation Instructions: 10000000
+Number of CPUs: 1
+LLC sets: 2048
+LLC ways: 16
+Off-chip DRAM Size: 4096 MB Channels: 1 Width: 64-bit Data Rate: 3200 MT/s
+
+CPU 0 runs /home/lovepreetsingh/Desktop/Classes/COA/ChampSim/dpc3_traces/649.fotonik3d_s-1B.champsimtrace.xz
+CPU 0 Bimodal branch predictor
+
+Warmup complete CPU 0 instructions: 1000003 cycles: 400931 (Simulation time: 0 hr 0 min 2 sec) 
+
+Heartbeat CPU 0 instructions: 10000001 cycles: 9487448 heartbeat IPC: 1.05402 cumulative IPC: 0.990478 (Simulation time: 0 hr 0 min 16 sec) 
+Finished CPU 0 instructions: 10000000 cycles: 10095278 cumulative IPC: 0.990562 (Simulation time: 0 hr 0 min 18 sec) 
+
+ChampSim completed all CPUs
+
+
+CPU 0 Branch Prediction Accuracy: 96.145% MPKI: 9.1661 Average ROB Occupancy at Mispredict: 48.0355
+
+
+-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------
+
+
+CPU 0 GSHARE branch predictor
+
+Warmup complete CPU 0 instructions: 1000003 cycles: 400927 (Simulation time: 0 hr 0 min 2 sec) 
+
+Heartbeat CPU 0 instructions: 10000001 cycles: 8370080 heartbeat IPC: 1.19473 cumulative IPC: 1.12935 (Simulation time: 0 hr 0 min 17 sec) 
+Finished CPU 0 instructions: 10000000 cycles: 8853985 cumulative IPC: 1.12943 (Simulation time: 0 hr 0 min 19 sec) 
+
+ChampSim completed all CPUs
+
+
+CPU 0 Branch Prediction Accuracy: 98.2442% MPKI: 4.1747 Average ROB Occupancy at Mispredict: 99.1023
+
+
+-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------
+
+
+
+Warmup complete CPU 0 instructions: 1000003 cycles: 400929 (Simulation time: 0 hr 0 min 2 sec) 
+
+Heartbeat CPU 0 instructions: 10000001 cycles: 7839510 heartbeat IPC: 1.27559 cumulative IPC: 1.20991 (Simulation time: 0 hr 0 min 22 sec) 
+Finished CPU 0 instructions: 10000000 cycles: 8264024 cumulative IPC: 1.21006 (Simulation time: 0 hr 0 min 25 sec) 
+
+ChampSim completed all CPUs
+
+
+CPU 0 Branch Prediction Accuracy: 99.8778% MPKI: 0.2906 Average ROB Occupancy at Mispredict: 346.432
+
+
+-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------
+
+
+
+Warmup complete CPU 0 instructions: 1000003 cycles: 400928 (Simulation time: 0 hr 0 min 3 sec) 
+
+Heartbeat CPU 0 instructions: 10000001 cycles: 8234949 heartbeat IPC: 1.21434 cumulative IPC: 1.14884 (Simulation time: 0 hr 0 min 23 sec) 
+Finished CPU 0 instructions: 10000000 cycles: 8703657 cumulative IPC: 1.14894 (Simulation time: 0 hr 0 min 25 sec) 
+
+ChampSim completed all CPUs
+
+
+CPU 0 Branch Prediction Accuracy: 99.0743% MPKI: 2.2011 Average ROB Occupancy at Mispredict: 169.125
+
+
+
