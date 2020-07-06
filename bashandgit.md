@@ -1,6 +1,7 @@
 >### Below are commonly used terminal and Git commands.
 
 ># Bash/Terminal Basics
+
 ``` bash
 # Make a new folder (aka make directory)
 mkdir <FOLDERNAME>
@@ -41,6 +42,7 @@ git clone <URL>
 ```
 
 ># Git Branches
+
 ``` git
 # Create a new branch
 git branch <BRANCHNAME>
@@ -55,6 +57,7 @@ git branch -m <NEWBRANCHNAME>
 ```
 
 ># Git Remotes
+
 ``` git
 # Add remote connections
 git remote add <REMOTENAME> <URL>
@@ -65,6 +68,7 @@ git remote -v
 ```
 
 ># Pulling in Git
+
 ``` git
 # Pull in changes
 git pull
@@ -75,6 +79,7 @@ git fetch --dry-run
 ```
 
 ># Push & Merge in Git
+
 ``` git 
 # Push changes
 git push <REMOTENAME> <BRANCHNAME>
@@ -83,6 +88,7 @@ git merge <BRANCHNAME>
 ```
 
 ># Deleting Remotes and Branches in Git
+
 ``` git
 # Delete a local branch
 git branch -D <BRANCHNAME>
