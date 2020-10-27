@@ -1,0 +1,815 @@
+#include "ooo_cpu.h"
+//#include "predictor.h"
+
+#define REMOVE_DUP_METHOD_1
+#define FOLDED_GHR_HASH 
+#define RECENCY_STACK
+
+#define LOG_BST 13
+#define MAXHIST 2048		
+#define WT_REG 10
+#define WL_1 11
+#define WT_RS 15
+#define WL_2 36
+#define REMOVE_DUP_DIST 32
+#define NFOLDED_HIST 128
+#define TRAIN_TH 82
+
+#define PHISTWIDTH 16   
+		
+#define NHIST 12
+
+int histLen[NHIST] = {64, 80, 96, 112, 128, 160, 192, 256, 320, 416, 512, 1024};
+
+#define PA_SHIFT_HASH 2    
+#define PHIST 65           
+#define FHIST_LEN 128      
+#define EXTRA_PHIST_START_DIST 64
+#define EXTRA_PHIST_END_DIST 1024
+#define PHIST_SET 36  
+
+/* --- weight tables --- */
+int32_t     *weight_b;          
+int32_t     **weight_m;         
+int32_t     *weight_rs;         
+
+bool HTrain;         
+bool *GHR;	         
+uint32_t *PA;	         
+bool *isBrStable;    
+
+uint32_t *PAFound;	   
+uint32_t *PADistConsd;	
+bool *filteredGHR;	      
+uint32_t *filteredHA;	       
+uint32_t *filteredHADist;	
+
+uint32_t *folded_hist; 
+
+uint32_t *OUTPOINT;
+uint32_t *idxConsd;
+bool *dirConsd;
+uint32_t corrFoundCurCycle = 0;
+
+
+
+bool *nonDupFilteredGHR1;           
+uint32_t *nonDupFilteredHA1;        
+uint32_t *nonDupFilteredHADist1;      
+
+int32_t GHRHeadPtr = 0;         
+int32_t PHISTHeadPtr = 0;       
+int32_t filteredGHRHeadPtr = 0; 
+
+int32_t threshold; 
+int32_t TC; 
+
+uint32_t numFetchedCondBr = 0;  
+
+	
+class bst_entry      
+{
+   public:
+      int state;
+      bst_entry ()
+      {
+         state = 0;
+      }
+};
+
+bst_entry *bst_table;			//branch status table
+bool prcpt_pred;
+
+/* _____________________________________________________________________*/
+/* initialize a single perceptron */
+void O3_CPU::initialize_branch_predictor() {
+   weight_b = new int32_t[1<<(WT_REG)];           
+   weight_m = new int32_t*[1<<(WT_REG)]; 
+            
+   for(int i = 0; i < (1<<(WT_REG)); ++i) {
+      weight_m[i] = new int32_t[WL_1];
+   }
+   
+   weight_rs = new int32_t[(1<<WT_RS)];     
+
+   GHR = new bool[NFOLDED_HIST];          
+   
+   PA = new uint32_t[PHIST];	               
+   isBrStable = new bool[PHIST];          
+   
+   filteredGHR = new bool[FHIST_LEN];     
+   filteredHA = new uint32_t[FHIST_LEN];	   
+   filteredHADist = new uint32_t[FHIST_LEN];	
+   
+   PAFound = new uint32_t[PHIST_SET];	      
+   PADistConsd = new uint32_t[PHIST_SET];	
+
+   folded_hist = new uint32_t[NFOLDED_HIST]; 
+   OUTPOINT = new uint32_t[NFOLDED_HIST];
+   idxConsd = new uint32_t[WL_1+WL_2];
+   dirConsd = new bool[WL_1+WL_2];
+
+   nonDupFilteredGHR1 = new bool[WL_2];      
+   nonDupFilteredHA1 = new uint32_t[WL_2];     
+   nonDupFilteredHADist1 = new uint32_t[WL_2]; 
+
+   bst_table = new bst_entry[1 << LOG_BST];
+   for (int idx = 0; idx < (1 << LOG_BST); idx++){
+      bst_table[idx].state = 0;
+   }
+
+   for (int i = 0; i < (1<<WT_REG); i++) {
+      for(int j = 0; j < WL_1; j++)
+      {
+         weight_m[i][j] = 0;
+      }
+      weight_b[i] = 0;
+   }
+   for (int i = 0; i < (1<<WT_RS); i++) {
+      weight_rs[i] = 0;
+   }
+
+   threshold = TRAIN_TH;
+   TC = 0;
+
+   for (int k = 0; k < NFOLDED_HIST; k++) {
+      GHR[k] = false;
+   }
+   for (int k = 0; k < FHIST_LEN; k++) {
+      filteredGHR[k] = false;
+      filteredHA[k] = 0;
+      filteredHADist[k] = 0;
+   }
+   for (int k = 0; k < PHIST_SET; k++) {
+      PAFound[k] = 0;
+      PADistConsd[k] = 0;
+   }
+
+   for (int k = 0; k < PHIST; k++) {
+      PA[k] = 0;
+      isBrStable[k] = true;
+   }
+   for (int k = 0; k < WL_2; k++) {
+      nonDupFilteredGHR1[k] = false;
+      nonDupFilteredHA1[k] = 0;
+      nonDupFilteredHADist1[k] = 0;
+   }
+
+   for (int i = 0; i < NFOLDED_HIST; i++) {
+      folded_hist[i] = 0;
+   }
+   for (int i = 0; i < WL_1; i++) {
+      OUTPOINT[i] = (i+1) % WT_REG;
+   }
+   for (int i = WL_1; i < NFOLDED_HIST; i++) {
+      OUTPOINT[i] = (i+1) % WT_RS;
+   }
+}
+
+/* _____________________________________________________________________*/
+
+
+// up-down saturating counter
+void ctrupdate (int32_t & ctr, bool taken, int nbits)
+{
+     if (taken)
+     {
+        if (ctr < ((1 << (nbits - 1)) - 1))
+           ctr++;
+     }
+     else
+     {
+        if (ctr > -(1 << (nbits - 1)))
+           ctr--;
+     }
+}
+
+uint32_t gen_widx(uint32_t cur_pc, uint32_t path_pc, uint32_t wt_size) 
+{
+    cur_pc = (cur_pc ) ^ (cur_pc / (1<<wt_size)); // ??
+    path_pc = path_pc >> PA_SHIFT_HASH;
+    path_pc = (path_pc) ^ (path_pc / (1<<wt_size));
+    uint32_t widx = cur_pc ^ (path_pc);
+    widx = widx % (1<<wt_size);
+    return widx;
+}
+
+uint32_t gen_bias_widx(uint32_t cur_pc, uint32_t wt_size) 
+{
+   cur_pc = (cur_pc ) ^ (cur_pc / (1<<wt_size));
+   uint32_t widx = cur_pc;
+   widx = widx % (1<<wt_size);
+   return widx;
+}
+
+/* _____________________________________________________________________*/
+
+uint8_t predDir;
+
+uint8_t O3_CPU::predict_branch(uint32_t PC)
+{
+    int32_t accum = 0;
+   corrFoundCurCycle = 0;
+   bool pred;
+   int corrConsd = 0;
+
+   // for biased branches
+   if (bst_table[PC & ((1 << LOG_BST) - 1)].state != 3) {
+      pred = (bst_table[PC & ((1 << LOG_BST) - 1)].state == 1)?true:false;
+   }
+   //for non-biased branches
+   else {
+      int non_dup_consd = 0;
+      int distantHist = 0;
+
+      
+      uint32_t bias_widx = gen_bias_widx(PC, WT_REG);
+      accum = accum + weight_b[bias_widx];
+
+      for(int j=0, histPtr=GHRHeadPtr, phistPtr=PHISTHeadPtr; j <WL_1; j++) {
+         uint32_t widx = gen_widx(PC, PA[phistPtr], WT_REG);
+#ifdef FOLDED_GHR_HASH
+         widx = widx ^ folded_hist[j];
+         widx = widx % (1<<WT_REG);
+#endif
+         if( GHR[histPtr] == 1)
+            accum += weight_m[widx][j];
+         else
+            accum -= weight_m[widx][j];  
+
+         idxConsd[corrFoundCurCycle] = widx;
+         dirConsd[corrFoundCurCycle] = GHR[histPtr];
+         corrFoundCurCycle++;
+
+         histPtr++;
+         if (histPtr == NFOLDED_HIST) histPtr = 0;
+         phistPtr++;
+         if (phistPtr == PHIST) phistPtr = 0;
+      }
+      
+      for(int j=WL_1, histPtr=(GHRHeadPtr+WL_1)%NFOLDED_HIST, phistPtr=(PHISTHeadPtr+WL_1)%PHIST;j<REMOVE_DUP_DIST; j++) {
+         if ((PA[phistPtr] != 0) && (isBrStable[phistPtr] == false)){
+            uint32_t widx = 0;
+            uint32_t distance;
+#ifdef RECENCY_STACK
+            widx = gen_widx(PC, PA[phistPtr], WT_RS); 
+            distance = (j+1) ^ ((j+1) / (1<<WT_RS)); // j = index in 1D weight table
+            widx = widx ^ (distance);
+            widx = widx % (1<<WT_RS);
+#ifdef FOLDED_GHR_HASH
+            widx = widx ^ folded_hist[j];
+            widx = widx % (1<<WT_RS);
+#endif
+            if(GHR[histPtr] == 1)		// If history is Taken
+               accum += weight_rs[widx];
+            else 				// If history is Not-Taken
+               accum -= weight_rs[widx];
+#endif
+            PADistConsd[distantHist] = j+1;
+
+            idxConsd[corrFoundCurCycle] = widx;
+            dirConsd[corrFoundCurCycle] = GHR[histPtr];
+            corrFoundCurCycle++;
+
+            distantHist++;
+         }
+         histPtr++;
+         if (histPtr == NFOLDED_HIST) histPtr = 0;
+         phistPtr++;
+         if (phistPtr == PHIST) phistPtr = 0;
+
+      }
+
+
+      // RS = nonDupfiltered...
+      for(int j=0;((distantHist < WL_2) && (j<WL_2)); j++, corrConsd++) {
+         //int pathPCDist = numFetchedCondBr - nonDupFilteredHADist1[j];
+         int pathPCDist = nonDupFilteredHADist1[j];
+         if ((nonDupFilteredHA1[j] != 0) && (pathPCDist < 1024)){
+            uint32_t widx = 0;
+            uint32_t distance;
+
+#ifdef RECENCY_STACK
+            widx = gen_widx(PC, nonDupFilteredHA1[j], WT_RS); 
+            distance = pathPCDist ^ (pathPCDist / (1<<WT_RS));
+            widx = widx ^ (distance);
+            widx = widx % (1<<WT_RS);
+#ifdef FOLDED_GHR_HASH
+            if ((pathPCDist-1) < NFOLDED_HIST) {
+               widx = widx ^ folded_hist[pathPCDist-1]; //??
+               widx = widx % (1<<WT_RS);
+            }
+            else {
+               widx = widx ^ folded_hist[NFOLDED_HIST-1];
+               widx = widx % (1<<WT_RS);
+            }
+#endif
+            if(nonDupFilteredGHR1[j] == 1)		// If history is Taken
+               accum += weight_rs[widx];
+            else 				// If history is Not-Taken
+               accum -= weight_rs[widx];
+#endif
+            PADistConsd[distantHist] = pathPCDist;
+
+            idxConsd[corrFoundCurCycle] = widx;
+            dirConsd[corrFoundCurCycle] = nonDupFilteredGHR1[j];
+            corrFoundCurCycle++;
+
+            distantHist++;
+         }
+         else {
+            break;
+         }
+      }
+
+      non_dup_consd = 0;
+      int prevPathPCDist = 0;
+
+    
+      for(int j=0, filteredHistPtr = filteredGHRHeadPtr; ((distantHist < WL_2) && (j < FHIST_LEN)); j++) {
+         int pathPCDist = filteredHADist[filteredHistPtr];
+         if ((pathPCDist > EXTRA_PHIST_START_DIST) && (filteredHA[filteredHistPtr] != 0) && (pathPCDist < EXTRA_PHIST_END_DIST)){
+
+            int prevPathPCBin = 0;
+            int curPathPCBin = 0;
+            for (int it1 = 0; it1 < (NHIST-1); it1++) {
+               if ((pathPCDist >= histLen[it1]) && (pathPCDist < histLen[it1+1])) {
+                  curPathPCBin = it1+1;
+               }
+               if ((prevPathPCDist >= histLen[it1]) && (prevPathPCDist < histLen[it1+1])) {
+                  prevPathPCBin = it1+1;
+               }
+            }
+            if (prevPathPCBin != curPathPCBin) {
+               non_dup_consd = 0;
+            }
+            prevPathPCDist = pathPCDist;
+
+            uint32_t widx = 0;
+            uint32_t distance;
+            bool considered = false;
+#ifdef REMOVE_DUP_METHOD_1
+            if (pathPCDist > REMOVE_DUP_DIST) {
+               for (int it2 = 0; ((it2 < non_dup_consd) && (it2 < PHIST_SET)); it2++) {
+                  if (PAFound[it2] == filteredHA[filteredHistPtr]) {
+                     considered = true;
+                     break;
+                  }
+               }
+               if (considered == false) {
+                  if (non_dup_consd < PHIST_SET) {
+                     PAFound[non_dup_consd] = filteredHA[filteredHistPtr];
+                     non_dup_consd++;
+                  }
+               }
+            }
+            
+            for (int it2 = 0; it2 < distantHist; it2++) {
+               if (PADistConsd[it2] == pathPCDist) {
+                  considered = true;
+                  break;
+               }
+            }
+            if (considered == false) {
+               PADistConsd[distantHist] = pathPCDist;
+               distantHist++;
+            }
+#endif
+            if (considered == false) {
+#ifdef RECENCY_STACK
+               widx = gen_widx(PC, filteredHA[filteredHistPtr], WT_RS);
+               distance = pathPCDist ^ (pathPCDist / (1<<WT_RS));
+               widx = widx ^ (distance);
+               widx = widx % (1<<WT_RS);
+#ifdef FOLDED_GHR_HASH
+               if ((pathPCDist-1) < NFOLDED_HIST) {
+                  widx = widx ^ folded_hist[pathPCDist-1];
+                  widx = widx % (1<<WT_RS);
+               }
+               else {
+                  widx = widx ^ folded_hist[NFOLDED_HIST-1];
+                  widx = widx % (1<<WT_RS);
+               }
+#endif
+               if(filteredGHR[filteredHistPtr] == 1)		// If history is Taken
+                  accum += weight_rs[widx];
+               else 				// If history is Not-Taken
+                  accum -= weight_rs[widx];
+#endif
+
+               idxConsd[corrFoundCurCycle] = widx;
+               dirConsd[corrFoundCurCycle] = filteredGHR[filteredHistPtr];
+               corrFoundCurCycle++;
+
+               //distantHist++;
+            }
+         }
+         else if ((filteredHA[filteredHistPtr] == 0) || (pathPCDist >= 1024)) {
+            break;
+         }
+         filteredHistPtr++;
+         if (filteredHistPtr == FHIST_LEN) filteredHistPtr = 0;
+
+      }
+
+      for(int j=corrConsd;((distantHist < WL_2) && (j<WL_2)); j++) { 
+         //int pathPCDist = numFetchedCondBr - nonDupFilteredHADist1[j];
+         int pathPCDist = nonDupFilteredHADist1[j];
+         if ((nonDupFilteredHA1[j] != 0) && (pathPCDist >= 1024) && (pathPCDist <= MAXHIST)){
+            uint32_t widx = 0;
+            uint32_t distance;
+#ifdef RECENCY_STACK
+            widx = gen_widx(PC, nonDupFilteredHA1[j], WT_RS);
+            distance = pathPCDist ^ (pathPCDist / (1<<WT_RS));
+            widx = widx ^ (distance);
+            widx = widx % (1<<WT_RS);
+#ifdef FOLDED_GHR_HASH
+            if ((pathPCDist-1) < NFOLDED_HIST) {
+               widx = widx ^ folded_hist[pathPCDist-1];
+               widx = widx % (1<<WT_RS);
+            }
+            else {
+               widx = widx ^ folded_hist[NFOLDED_HIST-1];
+               widx = widx % (1<<WT_RS);
+            }
+#endif
+            if(nonDupFilteredGHR1[j] == 1)		// If history is Taken
+               accum += weight_rs[widx];
+            else 				// If history is Not-Taken
+               accum -= weight_rs[widx];
+#endif
+            PADistConsd[distantHist] = pathPCDist;
+
+            idxConsd[corrFoundCurCycle] = widx;
+            dirConsd[corrFoundCurCycle] = nonDupFilteredGHR1[j];
+            corrFoundCurCycle++;
+
+            distantHist++;
+         }
+         else if ((nonDupFilteredHA1[j] == 0) || (pathPCDist > MAXHIST)){
+            break;
+         }
+      }
+
+      pred = (accum >= 0);
+
+   }
+
+   if(accum>-threshold && accum<threshold)
+      HTrain=true; // true means trainning needed
+   else
+      HTrain=false;
+   
+   predDir = ((pred == true)?1:0);
+   
+   return ((pred==true)?1:0);
+}
+
+
+/*_____________________________________________________________________*/
+
+//void O3_CPU::last_branch_result(uint32_t PC, bool resolveDir, bool predDir){
+void O3_CPU::last_branch_result(uint32_t PC, uint8_t resolveDir){
+   uint8_t t = resolveDir; // actual prediction
+
+   int corrConsd = 0;
+   
+   if (bst_table[PC & ((1 << LOG_BST) - 1)].state == 0) {
+      if (resolveDir == true) bst_table[PC & ((1 << LOG_BST) - 1)].state = 1;
+      else bst_table[PC & ((1 << LOG_BST) - 1)].state = 2;
+   }
+   
+   else if (((bst_table[PC & ((1 << LOG_BST) - 1)].state == 1) || (bst_table[PC & ((1 << LOG_BST) - 1)].state == 2)) && (t != ((bst_table[PC & ((1 << LOG_BST) - 1)].state == 1)? true:false))) { // actual prediction != our prediction
+      
+      bst_table[PC & ((1 << LOG_BST) - 1)].state = 3;
+
+      uint32_t bias_widx = gen_bias_widx(PC, WT_REG);
+      if (t == 1) {
+         if (weight_b[bias_widx] < 31) weight_b[bias_widx]++; // 31 ??
+      }
+      else {
+         if (weight_b[bias_widx] > -32) weight_b[bias_widx]--;
+      }
+
+      int non_dup_consd = 0;
+      int distantHist = 0;
+
+      for(int j=0, histPtr=GHRHeadPtr, phistPtr=PHISTHeadPtr; j <WL_1; j++) {
+         uint32_t widx = gen_widx(PC, PA[phistPtr], WT_REG);
+#ifdef FOLDED_GHR_HASH
+         widx = widx ^ folded_hist[j];
+         widx = widx % (1<<WT_REG);
+#endif
+         if(t == GHR[histPtr]) 
+         { if(weight_m[widx][j]<31) weight_m[widx][j]++;}
+         else if(t != GHR[histPtr])
+         { if(weight_m[widx][j]>-32) weight_m[widx][j]--;}
+
+         histPtr++;
+         if (histPtr == NFOLDED_HIST) histPtr = 0;
+         phistPtr++;
+         if (phistPtr == PHIST) phistPtr = 0;
+
+      }
+
+      for(int j=WL_1, histPtr=(GHRHeadPtr+WL_1)%NFOLDED_HIST, phistPtr=(PHISTHeadPtr+WL_1)%PHIST;j<REMOVE_DUP_DIST; j++) {
+         if ((PA[phistPtr] != 0) && (isBrStable[phistPtr] == false)){
+            uint32_t widx = 0;
+            uint32_t distance;
+#ifdef RECENCY_STACK
+            widx = gen_widx(PC, PA[phistPtr], WT_RS);
+            distance = (j+1) ^ ((j+1) / (1<<WT_RS));
+            widx = widx ^ (distance);
+            widx = widx % (1<<WT_RS);
+#ifdef FOLDED_GHR_HASH
+            widx = widx ^ folded_hist[j];
+            widx = widx % (1<<WT_RS);
+#endif
+            if(t == GHR[histPtr])
+            { if(weight_rs[widx]<15) weight_rs[widx]++;}
+            else if(t != GHR[histPtr])
+            { if(weight_rs[widx]>-16) weight_rs[widx]--;}
+#endif
+            PADistConsd[distantHist] = j+1;
+            distantHist++;
+         }
+         histPtr++;
+         if (histPtr == NFOLDED_HIST) histPtr = 0;
+         phistPtr++;
+         if (phistPtr == PHIST) phistPtr = 0;
+
+      }
+
+      for(int j=0;((distantHist < WL_2) && (j<WL_2)); j++, corrConsd++) {
+         //int pathPCDist = numFetchedCondBr - nonDupFilteredHADist1[j];
+         int pathPCDist = nonDupFilteredHADist1[j];
+         if ((nonDupFilteredHA1[j] != 0) && (pathPCDist < 1024)){
+            uint32_t widx = 0;
+            uint32_t distance;
+
+#ifdef RECENCY_STACK
+            widx = gen_widx(PC, nonDupFilteredHA1[j], WT_RS);
+            distance = pathPCDist ^ (pathPCDist / (1<<WT_RS));
+            widx = widx ^ (distance);
+            widx = widx % (1<<WT_RS);
+#ifdef FOLDED_GHR_HASH
+            if ((pathPCDist-1) < NFOLDED_HIST) {
+               widx = widx ^ folded_hist[pathPCDist-1];
+               widx = widx % (1<<WT_RS);
+            }
+            else {
+               widx = widx ^ folded_hist[NFOLDED_HIST-1];
+               widx = widx % (1<<WT_RS);
+            }
+#endif
+            if(t == nonDupFilteredGHR1[j])
+            { if(weight_rs[widx]<15) weight_rs[widx]++;}
+            else if(t != nonDupFilteredGHR1[j])
+            { if(weight_rs[widx]>-16) weight_rs[widx]--;}
+#endif
+            PADistConsd[distantHist] = pathPCDist;
+            distantHist++;
+         }
+         else {
+            break;
+         }
+      }
+
+      non_dup_consd = 0;
+      int prevPathPCDist = 0;
+
+      for(int j=0, filteredHistPtr = filteredGHRHeadPtr; ((distantHist < WL_2) && (j < FHIST_LEN)); j++) {
+         //int pathPCDist = numFetchedCondBr - filteredHADist[filteredHistPtr];
+         int pathPCDist = filteredHADist[filteredHistPtr];
+         if ((pathPCDist > EXTRA_PHIST_START_DIST) && (filteredHA[filteredHistPtr] != 0) && (pathPCDist < EXTRA_PHIST_END_DIST)){
+
+            int prevPathPCBin = 0;
+            int curPathPCBin = 0;
+            for (int it1 = 0; it1 < (NHIST-1); it1++) {
+               if ((pathPCDist >= histLen[it1]) && (pathPCDist < histLen[it1+1])) {
+                  curPathPCBin = it1+1;
+               }
+               if ((prevPathPCDist >= histLen[it1]) && (prevPathPCDist < histLen[it1+1])) {
+                  prevPathPCBin = it1+1;
+               }
+            }
+            if (prevPathPCBin != curPathPCBin) {
+               non_dup_consd = 0;
+            }
+            prevPathPCDist = pathPCDist;
+
+            uint32_t widx = 0;
+            uint32_t distance;
+            bool considered = false;
+#ifdef REMOVE_DUP_METHOD_1
+            if (pathPCDist > REMOVE_DUP_DIST) {
+               for (int it2 = 0; ((it2 < non_dup_consd) && (it2 < PHIST_SET)); it2++) {
+                  if (PAFound[it2] == filteredHA[filteredHistPtr]) {
+                     considered = true;
+                     break;
+                  }
+               }
+               if (considered == false) {
+                  if (non_dup_consd < PHIST_SET) {
+                     PAFound[non_dup_consd] = filteredHA[filteredHistPtr];
+                     non_dup_consd++;
+                  }
+               }
+            }
+
+            for (int it2 = 0; it2 <distantHist; it2++) {
+               if (PADistConsd[it2] == pathPCDist) {
+                  considered = true;
+                  break;
+               }
+            }
+            if (considered == false) {
+               PADistConsd[distantHist] = pathPCDist;
+               distantHist++;
+            }
+#endif
+            if (considered == false) {
+#ifdef RECENCY_STACK
+               widx = gen_widx(PC, filteredHA[filteredHistPtr], WT_RS);
+               distance = pathPCDist ^ (pathPCDist / (1<<WT_RS));
+               widx = widx ^ (distance);
+               widx = widx % (1<<WT_RS);
+#ifdef FOLDED_GHR_HASH
+            if ((pathPCDist-1) < NFOLDED_HIST) {
+               widx = widx ^ folded_hist[pathPCDist-1];
+               widx = widx % (1<<WT_RS);
+            }
+            else {
+               widx = widx ^ folded_hist[NFOLDED_HIST-1];
+               widx = widx % (1<<WT_RS);
+            }
+#endif
+               if(t == filteredGHR[filteredHistPtr])
+               { if(weight_rs[widx]<15) weight_rs[widx]++;}
+               else if(t != filteredGHR[filteredHistPtr])
+               { if(weight_rs[widx]>-16) weight_rs[widx]--;}
+#endif
+               //distantHist++;
+            }
+         }
+         else if ((filteredHA[filteredHistPtr] == 0) || (pathPCDist >= 1024)) {
+            break;
+         }
+         filteredHistPtr++;
+         if (filteredHistPtr == FHIST_LEN) filteredHistPtr = 0;
+
+      }
+
+      for(int j=corrConsd;((distantHist < WL_2) && (j<WL_2)); j++) {
+         //int pathPCDist = numFetchedCondBr - nonDupFilteredHADist1[j];
+         int pathPCDist = nonDupFilteredHADist1[j];
+         if ((nonDupFilteredHA1[j] != 0) && (pathPCDist >= 1024) && (pathPCDist <= MAXHIST)){
+            uint32_t widx = 0;
+            uint32_t distance;
+#ifdef RECENCY_STACK
+            widx = gen_widx(PC, nonDupFilteredHA1[j], WT_RS);
+            distance = pathPCDist ^ (pathPCDist / (1<<WT_RS));
+            widx = widx ^ (distance);
+            widx = widx % (1<<WT_RS);
+#ifdef FOLDED_GHR_HASH
+            if ((pathPCDist-1) < NFOLDED_HIST) {
+               widx = widx ^ folded_hist[pathPCDist-1];
+               widx = widx % (1<<WT_RS);
+            }
+            else {
+               widx = widx ^ folded_hist[NFOLDED_HIST-1];
+               widx = widx % (1<<WT_RS);
+            }
+#endif
+            if(t == nonDupFilteredGHR1[j])
+            { if(weight_rs[widx]<15) weight_rs[widx]++;}
+            else if(t != nonDupFilteredGHR1[j])
+            { if(weight_rs[widx]>-16) weight_rs[widx]--;}
+#endif
+            PADistConsd[distantHist] = pathPCDist;
+            distantHist++;
+         }
+         else if ((nonDupFilteredHA1[j] == 0) || (pathPCDist > MAXHIST)){
+            break;
+         }
+      }
+   }
+   
+   else if (((bst_table[PC & ((1 << LOG_BST) - 1)].state == 1) || (bst_table[PC & ((1 << LOG_BST) - 1)].state == 2)) && (t == ((bst_table[PC & ((1 << LOG_BST) - 1)].state == 1)? true:false))) {
+   }
+   else if( (t != predDir) || (HTrain == true) ) 	//Training needed if threshold not exceeded or predict wrong
+   {
+      uint32_t bias_widx = gen_bias_widx(PC, WT_REG);
+      if (t == 1) {
+         if (weight_b[bias_widx] < 31)  weight_b[bias_widx]++;
+      }
+      else {
+         if (weight_b[bias_widx] > -32) weight_b[bias_widx]--;
+      }
+
+      for(int j = 0; j < WL_1; j++)	{
+         if(t == dirConsd[j]) //??
+         { if(weight_m[idxConsd[j]][j]<31) weight_m[idxConsd[j]][j]++;}
+         else if(t != dirConsd[j])
+         { if(weight_m[idxConsd[j]][j]>-32) weight_m[idxConsd[j]][j]--;}
+      }
+      for(int j = WL_1; j < corrFoundCurCycle; j++) {
+         if(t == dirConsd[j])
+         { if(weight_rs[idxConsd[j]]<15) weight_rs[idxConsd[j]]++;}
+         else if(t != dirConsd[j])
+         { if(weight_rs[idxConsd[j]]>-16) weight_rs[idxConsd[j]]--;}
+      }
+   }
+
+   // threshold adjusting 
+   if (bst_table[PC & ((1 << LOG_BST) - 1)].state == 3) {
+      if(t != predDir) {
+         TC++;
+         if(TC==63) {
+            TC = 0;
+            threshold++;
+         }
+      }
+      else if((t==predDir) && (HTrain == true)) {
+         TC--;
+         if(TC==-63) {
+            TC = 0;
+            threshold--;
+         }		
+      }
+   }
+
+   for (int hiter = 0, histPtr=GHRHeadPtr; hiter < WL_1; hiter++) {
+      folded_hist[hiter] = (folded_hist[hiter] << 1) | (resolveDir?1:0);
+      folded_hist[hiter] ^= ((GHR[histPtr]?1:0) << OUTPOINT[hiter]);
+      folded_hist[hiter] ^= (folded_hist[hiter] >> WT_REG);
+      folded_hist[hiter] &= (1 << WT_REG) - 1;
+
+      histPtr++;
+      if (histPtr == NFOLDED_HIST) histPtr = 0;
+
+   }
+   for (int hiter = WL_1, histPtr=(GHRHeadPtr+WL_1)%NFOLDED_HIST; hiter < NFOLDED_HIST; hiter++) {
+      folded_hist[hiter] = (folded_hist[hiter] << 1) | (resolveDir?1:0);
+      folded_hist[hiter] ^= ((GHR[histPtr]?1:0) << OUTPOINT[hiter]);
+      folded_hist[hiter] ^= (folded_hist[hiter] >> WT_RS);
+      folded_hist[hiter] &= (1 << WT_RS) - 1;
+
+      histPtr++;
+      if (histPtr == NFOLDED_HIST) histPtr = 0;
+
+   }
+
+   bool isStableBranch = (bst_table[PC & ((1 << LOG_BST) - 1)].state != 3)?true:false;
+
+   /*----- Update unfiltered GHR and path history ------*/
+   GHRHeadPtr--;
+   if (GHRHeadPtr == -1) GHRHeadPtr = NFOLDED_HIST-1;
+   GHR[GHRHeadPtr] = resolveDir;
+   PHISTHeadPtr--;
+   if (PHISTHeadPtr == -1) PHISTHeadPtr = PHIST-1;
+   PA[PHISTHeadPtr] = PC;
+   isBrStable[PHISTHeadPtr] = isStableBranch;
+
+   for(int j=0; j< FHIST_LEN; j++) {
+      if (filteredHA[j] != 0) filteredHADist[j]++;
+   }
+
+   if (numFetchedCondBr >= EXTRA_PHIST_START_DIST) {
+      if (isBrStable[(PHISTHeadPtr+EXTRA_PHIST_START_DIST)%PHIST] == false) {
+         filteredGHRHeadPtr--;
+         if (filteredGHRHeadPtr == -1) filteredGHRHeadPtr = FHIST_LEN-1;
+         filteredGHR[filteredGHRHeadPtr] = GHR[(GHRHeadPtr+EXTRA_PHIST_START_DIST)%NFOLDED_HIST]?1:0;
+         filteredHA[filteredGHRHeadPtr] = PA[(PHISTHeadPtr+EXTRA_PHIST_START_DIST)%PHIST];
+         filteredHADist[filteredGHRHeadPtr]=EXTRA_PHIST_START_DIST+1;
+      }
+   }
+
+   for(int j=0; j<WL_2; j++) {
+      if (nonDupFilteredHA1[j] != 0) nonDupFilteredHADist1[j]++;
+   }
+   
+   if (numFetchedCondBr >= REMOVE_DUP_DIST) {
+      if (isBrStable[(PHISTHeadPtr+REMOVE_DUP_DIST)%PHIST] == false) {
+         int j = 0;
+         for(j=0; j<WL_2; j++)
+         {
+            if (PA[(PHISTHeadPtr+REMOVE_DUP_DIST)%PHIST] == nonDupFilteredHA1[j]) {j++; break;}    //Find if a prior occurrence is already present in RS
+         }
+         for (int k = j-1; k>0; k--) {
+            nonDupFilteredGHR1[k] = nonDupFilteredGHR1[k-1];
+            nonDupFilteredHA1[k]=nonDupFilteredHA1[k-1];
+            nonDupFilteredHADist1[k]=nonDupFilteredHADist1[k-1];
+         }
+         nonDupFilteredGHR1[0] = GHR[(GHRHeadPtr+REMOVE_DUP_DIST)%NFOLDED_HIST]?1:0;
+         nonDupFilteredHA1[0]=PA[(PHISTHeadPtr+REMOVE_DUP_DIST)%PHIST];
+         nonDupFilteredHADist1[0]=REMOVE_DUP_DIST + 1;
+      }
+   }
+   numFetchedCondBr++;
+
+}
+
+/* _____________________________________________________________________*/
+
+
